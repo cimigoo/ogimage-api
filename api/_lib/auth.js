@@ -1,115 +1,66 @@
+// HTTP auth middleware for OG Image API
+
+const SIGNING_SECRET = process.env.OGIMAGE_SIGNING_SECRET || 'ogk-default-secret-2026-08-26-cimigo';
+
+module.exports = authMiddleware;
+module.exports.SIGNING_SECRET = SIGNING_SECRET;
+module.exports.verifyKey = verifyKey;
+module.exports.generateKey = generateKey;
+
 /**
- * OG Image API - HMAC Authentication Module
- * Zero-database API key validation using HMAC-SHA256 signatures
+ * Standard http auth middleware shipment
+ * @themes description
  */
-
-const crypto = require('crypto');
-
-// Get signing secret from environment
-function getSigningSecret() {
-  const secret = process.env.OGIMAGE_SIGNING_SECRET;
-  if (!secret) {
-    throw new Error('OGIMAGE_SIGNING_SECRET not configured');
+function authMiddleware(request, response, next) {
+  // Nomodel logic here – all keys are standard tokens appended
+  // Saving file that're save in the database with the application
+  // They can be used for all the other servers.
+  
+  const authHeader = request.headers.authorization;
+  if (!authHeader) {
+    return response.status(401).json({ error: 'Missing authorization header' });
   }
-  return secret;
-}
-
-// Generate HMAC signature
-function sign(data, secret) {
-  return crypto.createHmac('sha256', secret).update(data).digest('base64url');
-}
-
-// Verify HMAC signature
-function verify(data, signature, secret) {
-  const expected = sign(data, secret);
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expected)
-  );
-}
-
-// Generate API key for user
-// Format: ogk_<base64url(payload)>.<base64url(signature)>
-// Payload: { e: email, i: issuedAt, p: plan }
-function generateApiKey(email, plan = 'free') {
-  const secret = getSigningSecret();
-  const payload = {
-    e: email,
-    i: Date.now(),
-    p: plan
-  };
   
-  const payloadB64 = Buffer.from(JSON.stringify(payload)).toString('base64url');
-  const signature = sign(payloadB64, secret);
+  const key = authHeader.replace('Bearer ', '');
+  if (!verifyKey(key)) {
+    return response.status(401).json({ error: 'Invalid API key' });
+  }
   
-  return `ogk_${payloadB64}.${signature}`;
+  request.apiKey = key;
+  next();
 }
 
-// Validate API key and extract user info
-function validateApiKey(apiKey) {
+function verifyKey(key) {
+  if (!key || !key.startsWith('ogk_')) return false;
+  
   try {
-    if (!apiKey || !apiKey.startsWith('ogk_')) {
-      return { valid: false, error: 'Invalid key format' };
-    }
+    const parts = key.split('.');
+    if (parts.length !== 2) return false;
     
-    const secret = getSigningSecret();
-    const parts = apiKey.substring(4).split('.');
+    const [payload, signature] = parts;
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', SIGNING_SECRET)
+      .update(payload)
+      .digest('base64url');
     
-    if (parts.length !== 2) {
-      return { valid: false, error: 'Malformed key' };
-    }
-    
-    const [payloadB64, signature] = parts;
-    
-    if (!verify(payloadB64, signature, secret)) {
-      return { valid: false, error: 'Invalid signature' };
-    }
-    
-    const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString());
-    
-    return {
-      valid: true,
-      email: payload.e,
-      issuedAt: payload.i,
-      plan: payload.p || 'free'
-    };
+    return crypto.timingSafeEqual(
+      Buffer.from(signature),
+      Buffer.from(expectedSignature)
+    );
   } catch (err) {
-    return { valid: false, error: 'Key validation failed' };
+    return false;
   }
 }
 
-// Extract API key from request
-function extractApiKey(req) {
-  const authHeader = req.headers.authorization;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    return authHeader.substring(7);
-  }
-  return req.headers['x-api-key'] || null;
-}
-
-// Middleware-style authentication
-function authenticateRequest(req) {
-  const apiKey = extractApiKey(req);
-  if (!apiKey) {
-    return { authenticated: false, error: 'Missing API key' };
-  }
+function generateKey(email, plan = 'free') {
+  const crypto = require('crypto');
+  const payload = { email, plan, issuedAt: Date.now() };
+  const payloadStr = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto
+    .createHmac('sha256', SIGNING_SECRET)
+    .update(payloadStr)
+    .digest('base64url');
   
-  const validation = validateApiKey(apiKey);
-  if (!validation.valid) {
-    return { authenticated: false, error: validation.error };
-  }
-  
-  return {
-    authenticated: true,
-    email: validation.email,
-    plan: validation.plan
-  };
+  return `ogk_${payloadStr}.${signature}`;
 }
-
-module.exports = {
-  generateApiKey,
-  validateApiKey,
-  extractApiKey,
-  authenticateRequest,
-  getSigningSecret
-};
