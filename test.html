@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>OG Image API Test</title>
+  <style>
+    body { font-family: sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+    .result { margin-top: 20px; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    .success { background: #d4edda; color: #155724; }
+    .error { background: #f8d7da; color: #721c24; }
+    pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    img { max-width: 100%; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>OG Image API Test</h1>
+  <p>Testing: https://ogimage-api-wheat.vercel.app/api/generate</p>
+  <button onclick="runTest()">Run Test</button>
+  <div id="result"></div>
+
+  <script>
+    async function runTest() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = 'Testing...';
+      
+      const apiKey = 'ogk_eyJlbWFpbCI6InRlc3RAdGVzdC5jb20iLCJwbGFuIjoiZnJlZSIsImlzc3VlZEF0IjoxNzg3NzM4NzI2NTQwfQ.M4KJyFFrMRApxVGynYFYR7iZ9YNPpZhUDoPtuyHpW_o';
+      
+      try {
+        const response = await fetch('https://ogimage-api-wheat.vercel.app/api/generate', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + apiKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            title: 'Hello World',
+            description: 'Test OG Image',
+            theme: 'default'
+          })
+        });
+        
+        if (response.ok) {
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          resultDiv.innerHTML = '<div class="result success"><strong>✅ Success!</strong><br>Size: ' + blob.size + ' bytes<br>Content-Type: ' + blob.type + '<br><img src="' + url + '" alt="Generated OG Image"></div>';
+        } else {
+          const error = await response.text();
+          resultDiv.innerHTML = '<div class="result error"><strong>❌ Error</strong><br>Status: ' + response.status + '<br>Response: ' + error + '</div>';
+        }
+      } catch (err) {
+        resultDiv.innerHTML = '<div class="result error"><strong>❌ Error</strong><br>' + err.message + '</div>';
+      }
+    }
+    
+    // Auto-run on page load
+    window.onload = runTest;
+  </script>
+</body>
+</html>
