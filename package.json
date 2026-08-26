@@ -1,0 +1,18 @@
+{
+  "name": "ogimage-api",
+  "version": "1.0.0",
+  "description": "OG Image Generation API - Developer-friendly dynamic social share image service",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "node ../vercel-deploy-v2.js"
+  },
+  "dependencies": {
+    "satori": "^0.10.13",
+    "@resvg/resvg-js": "^2.6.2",
+    "yoga-wasm-web": "^0.3.3"
+  },
+  "devDependencies": {
+    "vercel": "^33.0.0"
+  }
+}
